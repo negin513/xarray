@@ -79,7 +79,7 @@ Attributes are persisted in all indexing operations.
 
 .. warning::
 
-    Positional indexing deviates from the NumPy when indexing with multiple
+    Xarray indexing behavior deviates from the NumPy when indexing with multiple
     arrays like ``da[[0, 1], [0, 1]]``, as described in
     :ref:`vectorized_indexing`.
 
