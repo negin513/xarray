@@ -319,19 +319,19 @@ is significantly slower than using :py:meth:`~xarray.DataArray.sel`.
 
 .. _vectorized_indexing:
 
-Pointwise Indexing
+Orthogonal vs. Pointwise indexing
 -------------------
 
 Xarray indexing behvaior deviates from NumPy when indexing with multiple arrays like ``da[[0, 1], [0, 1]]``.
-By default, Xarray use orthogonal indexing, where each indexer component selects independently along the corresponding dimension.
-This is different from NumPy's indexing behavior, where the indexers are broadcasted together and used to index the array. (Pointwise indexing)
 
 If you only provide integers, slices, or unlabeled arrays (array without
 dimension names, such as ``np.ndarray``, ``list``, but not
-:py:meth:`~xarray.DataArray` or :py:meth:`~xarray.Variable`) indexing can be
+:py:meth:`~xarray.DataArray` or :py:meth:`~xarray.Variable`) Xarray indexing is
 understood as orthogonally. Each indexer component selects independently along
 the corresponding dimension, similar to how vector indexing works in Fortran or
 MATLAB, or after using the :py:func:`numpy.ix_` helper:
+
+This is different from NumPy's default indexing behavior, where the indexers are broadcasted together and used to index the array (i.e. pointwise indexing).
 
 The figure below illustrates the difference between orthogonal and pointwise indexing.
 
@@ -339,12 +339,15 @@ The figure below illustrates the difference between orthogonal and pointwise ind
    :align: center
    :width: 800px
 
-Pointwise or Vectorized indexing, shown on the left, selects specific elements at given coordinates, resulting in an array of those individual elements.
-In the example shown, the indices ``[0, 2, 4]``, ``[0, 2, 4]`` select the elements at positions ``(0, 0)``, ``(2, 2)``, and ``(4, 4)``, resulting in the values ``[1, 13, 25]``.
+
+*Pointwise* or *Vectorized* indexing, shown on the left, selects specific elements at given coordinates, resulting in an array of those individual elements.
+In the example shown above, the indices ``[0, 2, 4]``, ``[0, 2, 4]`` select the elements at positions ``(0, 0)``, ``(2, 2)``, and ``(4, 4)``, resulting in the values ``[1, 13, 25]``.
 
 In contrast, orthogonal indexing uses the same indices to select entire rows and columns, forming a cross-product of the specified indices.
-This method results in sub-arrays that include all combinations of the selected rows and columns. The example demonstrates this by selecting rows 0, 2, and 4 and columns 0, 2, and 4, resulting in a subarray containing ``[[1, 3, 5], [11, 13, 15], [21, 23, 25]]``.
+This method results in sub-arrays that include all combinations of the selected rows and columns.
+In the above figure (right), selecting rows 0, 2, and 4 and columns 0, 2, and 4, resulting in a subarray containing ``[[1, 3, 5], [11, 13, 15], [21, 23, 25]]``.
 
+By default, Xarray use orthogonal indexing (right figure), where each indexer component selects independently along the corresponding dimension:
 
 .. ipython:: python
 
@@ -354,7 +357,8 @@ This method results in sub-arrays that include all combinations of the selected 
         coords={"x": [0, 1, 2], "y": ["a", "b", "c", "d"]},
     )
     da
-    da[[0, 2, 2], [1, 3]]
+    da[[0, 2, 2], [1, 3]]  # orthogonal indexing
+
 
 For more flexibility, you can supply :py:meth:`~xarray.DataArray` objects
 as indexers.
@@ -374,7 +378,8 @@ the same dimension which is indexed along:
 
     # Because [0, 1] is used to index along dimension 'x',
     # it is assumed to have dimension 'x'
-    da[[0, 1], ind_x]
+    # so output has dimention of `x, y`
+    da[[0, 1], ind_y]
 
 Furthermore, you can use multi-dimensional :py:meth:`~xarray.DataArray`
 as indexers, where the resultant array dimension is also determined by
@@ -385,6 +390,9 @@ indexers' dimension:
     ind = xr.DataArray([[0, 1], [0, 1]], dims=["a", "b"])
     da[ind]
 
+
+Like NumPy and pandas, Xarray also supports indexing many array elements at once in a vectorized manner.
+
 Similar to how `NumPy's advanced indexing`_ works, vectorized
 indexing for xarray is based on our
 :ref:`broadcasting rules <compute.broadcasting>`.
@@ -392,9 +400,17 @@ See :ref:`indexing.rules` for the complete specification.
 
 .. _NumPy's advanced indexing: https://numpy.org/doc/stable/reference/arrays.indexing.html
 
-Vectorized indexing also works with ``isel``, ``loc``, and ``sel``:
+To trigger vectorized indexing behavior (i.e. pointwise indexing), you will need to provide the selection dimensions with a new **shared** output dimension name.
+This means that the dimensions of both indexers must be the same, and the output will have the same dimension name as the indexers. For example:
+
 
 .. ipython:: python
+
+    da = xr.DataArray(
+        np.arange(12).reshape((3, 4)),
+        dims=["x", "y"],
+        coords={"x": [0, 1, 2], "y": ["a", "b", "c", "d"]},
+    )
 
     ind = xr.DataArray([[0, 1], [0, 1]], dims=["a", "b"])
     da.isel(y=ind)  # same as da[:, ind]
@@ -402,21 +418,25 @@ Vectorized indexing also works with ``isel``, ``loc``, and ``sel``:
     ind = xr.DataArray([["a", "b"], ["b", "a"]], dims=["a", "b"])
     da.loc[:, ind]  # same as da.sel(y=ind)
 
-These methods may also be applied to ``Dataset`` objects
+These methods may also be applied to ``Dataset`` objects.
+
+Vectorized indexing also works with ``isel``, ``loc``, and ``sel``:
 
 .. ipython:: python
 
     ds = da.to_dataset(name="bar")
     ds.isel(x=xr.DataArray([0, 1, 2], dims=["points"]))
 
-Vectorized indexing may be used to extract information from the nearest
+
+
+Vectorized (or pointwise) indexing may be used to extract information from the nearest
 grid cells of interest, for example, the nearest climate model grid cells
 to a collection specified weather station latitudes and longitudes.
-To trigger vectorized indexing behavior
-you will need to provide the selection dimensions with a new
-shared output dimension name. In the example below, the selections
-of the closest latitude and longitude are renamed to an output
-dimension named "points":
+
+In the following example, we use pointwise indexing to extract the air temperature at the grid cells nearest to
+the target latitudes and longitudes ( for example observation sites).
+For this, we first create DataArray objects for the latitude and longitude of the observation sites using a shared dimension name ``points``,
+and then use them to index the DataArray air_temperature:
 
 
 .. ipython:: python
