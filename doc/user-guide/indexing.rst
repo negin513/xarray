@@ -319,11 +319,12 @@ is significantly slower than using :py:meth:`~xarray.DataArray.sel`.
 
 .. _vectorized_indexing:
 
-Vectorized Indexing
+Pointwise Indexing
 -------------------
 
-Like numpy and pandas, xarray supports indexing many array elements at once in a
-`vectorized` manner.
+Xarray indexing behvaior deviates from NumPy when indexing with multiple arrays like ``da[[0, 1], [0, 1]]``.
+By default, Xarray use orthogonal indexing, where each indexer component selects independently along the corresponding dimension.
+This is different from NumPy's indexing behavior, where the indexers are broadcasted together and used to index the array. (Pointwise indexing)
 
 If you only provide integers, slices, or unlabeled arrays (array without
 dimension names, such as ``np.ndarray``, ``list``, but not
@@ -331,6 +332,19 @@ dimension names, such as ``np.ndarray``, ``list``, but not
 understood as orthogonally. Each indexer component selects independently along
 the corresponding dimension, similar to how vector indexing works in Fortran or
 MATLAB, or after using the :py:func:`numpy.ix_` helper:
+
+The figure below illustrates the difference between orthogonal and pointwise indexing.
+
+.. figure:: /_static/indexing/orthogonal_vs_pointwise.png
+   :align: center
+   :width: 800px
+
+Pointwise or Vectorized indexing, shown on the left, selects specific elements at given coordinates, resulting in an array of those individual elements.
+In the example shown, the indices ``[0, 2, 4]``, ``[0, 2, 4]`` select the elements at positions ``(0, 0)``, ``(2, 2)``, and ``(4, 4)``, resulting in the values ``[1, 13, 25]``.
+
+In contrast, orthogonal indexing uses the same indices to select entire rows and columns, forming a cross-product of the specified indices.
+This method results in sub-arrays that include all combinations of the selected rows and columns. The example demonstrates this by selecting rows 0, 2, and 4 and columns 0, 2, and 4, resulting in a subarray containing ``[[1, 3, 5], [11, 13, 15], [21, 23, 25]]``.
+
 
 .. ipython:: python
 
