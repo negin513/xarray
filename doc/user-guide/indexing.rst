@@ -420,23 +420,19 @@ This means that the dimensions of both indexers must be the same, and the output
 
 These methods may also be applied to ``Dataset`` objects.
 
-Vectorized indexing also works with ``isel``, ``loc``, and ``sel``:
-
 .. ipython:: python
 
     ds = da.to_dataset(name="bar")
     ds.isel(x=xr.DataArray([0, 1, 2], dims=["points"]))
 
-
-
-Vectorized (or pointwise) indexing may be used to extract information from the nearest
+Vectorized (or pointwise) indexing can be used to extract information from the nearest
 grid cells of interest, for example, the nearest climate model grid cells
 to a collection specified weather station latitudes and longitudes.
 
 In the following example, we use pointwise indexing to extract the air temperature at the grid cells nearest to
 the target latitudes and longitudes ( for example observation sites).
 For this, we first create DataArray objects for the latitude and longitude of the observation sites using a shared dimension name ``points``,
-and then use them to index the DataArray air_temperature:
+and then use them to index the DataArray ``air_temperature``:
 
 
 .. ipython:: python
